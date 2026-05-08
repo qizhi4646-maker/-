@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>协作文档</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #faf9f7;
+    --surface: #ffffff;
+    --border: #e8e4de;
+    --border-light: #f0ece6;
+    --text-primary: #1a1816;
+    --text-secondary: #6b6560;
+    --text-muted: #a09890;
+    --accent: #2d5a27;
+    --accent-light: #e8f0e7;
+    --accent-hover: #3d7a35;
+    --warning: #c0392b;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+    --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+    --radius: 8px;
+    --transition: 0.18s ease;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans SC', sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ─── Header ─── */
+  #header {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    display: flex; align-items: center; gap: 0;
+    height: 52px;
+    padding: 0 16px;
+  }
+
+  #doc-title-input {
+    flex: 1;
+    font-family: 'Noto Serif SC', serif;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text-primary);
+    border: none; background: transparent;
+    outline: none;
+    padding: 4px 8px;
+  }
+  #doc-title-input::placeholder { color: var(--text-muted); }
+
+  .header-divider {
+    width: 1px; height: 22px;
+    background: var(--border); margin: 0 8px;
+  }
+
+  .header-btn {
+    display: flex; align-items: center; gap: 5px;
+    padding: 6px 12px;
+    border: none; border-radius: 6px;
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: var(--transition);
+    white-space: nowrap;
+  }
+  .header-btn.primary {
+    background: var(--accent); color: #fff;
+  }
+  .header-btn.primary:hover { background: var(--accent-hover); }
+  .header-btn.ghost {
+    background: transparent; color: var(--text-secondary);
+  }
+  .header-btn.ghost:hover {
+    background: var(--accent-light); color: var(--accent);
+  }
+
+  #sync-status {
+    font-size: 12px; color: var(--text-muted);
+    padding: 0 6px;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--text-muted);
+    transition: background 0.3s;
+  }
+  .dot.saved { background: #27ae60; }
+  .dot.saving { background: #f39c12; animation: pulse 1s infinite; }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; } 50% { opacity: 0.4; }
+  }
+
+  /* ─── Toolbar ─── */
+  #toolbar {
+    position: sticky; top: 52px; z-index: 90;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border-light);
+    display: flex; align-items: center; gap: 2px;
+    padding: 6px 16px;
+    flex-wrap: wrap;
+  }
+
+  .tb-group {
+    display: flex; align-items: center; gap: 1px;
+    padding: 0 4px;
+    border-right: 1px solid var(--border);
+  }
+  .tb-group:last-child { border-right: none; }
+
+  .tb-btn {
+    width: 30px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    border: none; border-radius: 5px;
+    background: transparent; cursor: pointer;
+    font-size: 14px; font-weight: 600;
+    color: var(--text-secondary);
+    transition: var(--transition);
+    font-family: 'Noto Serif SC', serif;
+  }
+  .tb-btn:hover { background: var(--accent-light); color: var(--accent); }
+  .tb-btn.active { background: var(--accent-light); color: var(--accent); }
+  .tb-btn svg { width: 15px; height: 15px; fill: currentColor; }
+
+  .tb-select {
+    height: 28px; padding: 0 8px;
+    border: 1px solid var(--border); border-radius: 5px;
+    background: var(--surface);
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 13px; color: var(--text-secondary);
+    cursor: pointer; outline: none;
+    transition: var(--transition);
+  }
+  .tb-select:hover, .tb-select:focus {
+    border-color: var(--accent); color: var(--accent);
+  }
+
+  /* ─── Layout ─── */
+  #main {
+    display: flex; flex: 1; overflow: hidden;
+  }
+
+  /* ─── Outline sidebar ─── */
+  #outline-panel {
+    width: 220px; min-width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    transition: width 0.2s ease;
+  }
+  #outline-panel.collapsed { width: 0; min-width: 0; }
+
+  .panel-header {
+    padding: 12px 16px 10px;
+    font-size: 11px; font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  #outline-list {
+    flex: 1; overflow-y: auto; padding: 8px 0;
+  }
+  #outline-list::-webkit-scrollbar { width: 4px; }
+  #outline-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .outline-item {
+    padding: 5px 16px;
+    font-size: 13px; color: var(--text-secondary);
+    cursor: pointer; transition: var(--transition);
+    border-left: 2px solid transparent;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .outline-item:hover { color: var(--accent); background: var(--accent-light); }
+  .outline-item.active { color: var(--accent); border-left-color: var(--accent); }
+  .outline-item.h1 { font-weight: 600; padding-left: 16px; }
+  .outline-item.h2 { padding-left: 24px; }
+  .outline-item.h3 { padding-left: 32px; font-size: 12px; }
+
+  /* ─── Editor area ─── */
+  #editor-wrap {
+    flex: 1; overflow-y: auto;
+    padding: 40px 0 80px;
+    background: var(--bg);
+  }
+  #editor-wrap::-webkit-scrollbar { width: 6px; }
+  #editor-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+
+  #editor-page {
+    max-width: 780px;
+    margin: 0 auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+    padding: 56px 72px 80px;
+    min-height: 900px;
+  }
+
+  #editor {
+    outline: none;
+    font-family: 'Noto Serif SC', serif;
+    font-size: 16px;
+    line-height: 1.9;
+    color: var(--text-primary);
+    caret-color: var(--accent);
+  }
+
+  /* Heading styles inside contenteditable */
+  #editor h1 {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 30px; font-weight: 700;
+    line-height: 1.35;
+    margin: 36px 0 12px;
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--border-light);
+    padding-bottom: 8px;
+  }
+  #editor h2 {
+    font-size: 22px; font-weight: 600;
+    line-height: 1.4; margin: 28px 0 10px;
+    color: var(--text-primary);
+  }
+  #editor h3 {
+    font-size: 18px; font-weight: 600;
+    line-height: 1.45; margin: 20px 0 8px;
+    color: var(--text-secondary);
+  }
+  #editor p {
+    margin: 0 0 12px;
+    min-height: 1.6em;
+  }
+  #editor p:empty::before {
+    content: '';
+    display: inline-block;
+  }
+  #editor blockquote {
+    border-left: 3px solid var(--accent);
+    margin: 16px 0;
+    padding: 8px 16px;
+    background: var(--accent-light);
+    border-radius: 0 4px 4px 0;
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+  #editor ul, #editor ol {
+    margin: 8px 0 12px 24px;
+    padding: 0;
+  }
+  #editor li { margin-bottom: 4px; }
+  #editor strong { font-weight: 700; }
+  #editor em { font-style: italic; }
+  #editor u { text-decoration: underline; }
+  #editor s { text-decoration: line-through; }
+  #editor code {
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    background: #f4f1ec;
+    padding: 2px 6px; border-radius: 4px;
+    color: var(--warning);
+  }
+  #editor a { color: var(--accent); text-decoration: underline; }
+
+  #editor [data-placeholder]:empty::before {
+    content: attr(data-placeholder);
+    color: var(--text-muted);
+    pointer-events: none;
+  }
+
+  /* ─── Collaborators ─── */
+  #collab-bar {
+    position: fixed; bottom: 20px; right: 24px;
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 8px 16px;
+    box-shadow: var(--shadow-lg);
+    font-size: 13px; color: var(--text-secondary);
+    z-index: 200;
+  }
+
+  .avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #fff;
+    border: 2px solid var(--surface);
+    margin-left: -6px;
+    cursor: default;
+  }
+  .avatar:first-child { margin-left: 0; }
+
+  /* ─── Share modal ─── */
+  #modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 500;
+    background: rgba(0,0,0,0.35); backdrop-filter: blur(2px);
+    align-items: center; justify-content: center;
+  }
+  #modal-overlay.show { display: flex; }
+
+  #modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    padding: 28px 32px 24px;
+    width: 440px;
+    max-width: calc(100vw - 32px);
+  }
+  #modal h3 {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 19px; margin-bottom: 6px;
+  }
+  #modal p { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; }
+
+  .share-link-box {
+    display: flex; gap: 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 10px 14px;
+    margin-bottom: 20px;
+  }
+  .share-link-box input {
+    flex: 1; border: none; background: transparent;
+    font-size: 13px; color: var(--text-secondary);
+    font-family: 'Noto Sans SC', sans-serif; outline: none;
+  }
+  .copy-btn {
+    border: none; background: var(--accent); color: #fff;
+    padding: 5px 14px; border-radius: 5px; font-size: 13px;
+    cursor: pointer; white-space: nowrap;
+    transition: var(--transition);
+  }
+  .copy-btn:hover { background: var(--accent-hover); }
+
+  .modal-close {
+    display: block; width: 100%; padding: 10px;
+    border: 1px solid var(--border); border-radius: 7px;
+    background: transparent; font-size: 14px;
+    color: var(--text-secondary); cursor: pointer;
+    transition: var(--transition);
+  }
+  .modal-close:hover { background: var(--bg); }
+
+  /* ─── Toast ─── */
+  #toast {
+    position: fixed; bottom: 80px; right: 24px; z-index: 600;
+    background: var(--text-primary); color: #fff;
+    padding: 10px 18px; border-radius: 8px;
+    font-size: 13px;
+    opacity: 0; transform: translateY(8px);
+    transition: opacity 0.25s, transform 0.25s;
+    pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  /* ─── Responsive ─── */
+  @media (max-width: 760px) {
+    #outline-panel { display: none; }
+    #editor-page { padding: 32px 24px 60px; margin: 0 12px; }
+    #editor-wrap { padding: 20px 0 60px; }
+  }
+  @media (max-width: 520px) {
+    #editor h1 { font-size: 22px; }
+    #editor h2 { font-size: 18px; }
+    .tb-btn { width: 26px; height: 26px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div id="header">
+  <input id="doc-title-input" type="text" value="未命名文档" maxlength="100" spellcheck="false">
+  <div class="header-divider"></div>
+  <div id="sync-status">
+    <div class="dot saved" id="sync-dot"></div>
+    <span id="sync-text">已保存</span>
+  </div>
+  <div class="header-divider"></div>
+  <button class="header-btn ghost" onclick="toggleOutline()">📋 大纲</button>
+  <button class="header-btn ghost" onclick="openShare()">🔗 分享</button>
+  <button class="header-btn primary" onclick="exportDoc()">⬇ 导出</button>
+</div>
+
+<!-- Toolbar -->
+<div id="toolbar">
+  <div class="tb-group">
+    <select class="tb-select" id="block-type" onchange="applyBlockType(this.value)" title="段落样式">
+      <option value="p">正文</option>
+      <option value="h1">标题 1</option>
+      <option value="h2">标题 2</option>
+      <option value="h3">标题 3</option>
+      <option value="blockquote">引用</option>
+    </select>
+  </div>
+
+  <div class="tb-group">
+    <button class="tb-btn" onclick="fmt('bold')" title="粗体 (Ctrl+B)"><strong>B</strong></button>
+    <button class="tb-btn" onclick="fmt('italic')" title="斜体 (Ctrl+I)"><em>I</em></button>
+    <button class="tb-btn" onclick="fmt('underline')" title="下划线 (Ctrl+U)"><u>U</u></button>
+    <button class="tb-btn" onclick="fmt('strikeThrough')" title="删除线"><s>S</s></button>
+  </div>
+
+  <div class="tb-group">
+    <button class="tb-btn" onclick="fmt('justifyLeft')" title="左对齐">
+      <svg viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="2" rx="1"/><rect x="1" y="6" width="9" height="2" rx="1"/><rect x="1" y="10" width="14" height="2" rx="1"/><rect x="1" y="14" width="7" height="2" rx="1"/></svg>
+    </button>
+    <button class="tb-btn" onclick="fmt('justifyCenter')" title="居中">
+      <svg viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="2" rx="1"/><rect x="3.5" y="6" width="9" height="2" rx="1"/><rect x="1" y="10" width="14" height="2" rx="1"/><rect x="4.5" y="14" width="7" height="2" rx="1"/></svg>
+    </button>
+    <button class="tb-btn" onclick="fmt('justifyRight')" title="右对齐">
+      <svg viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="2" rx="1"/><rect x="6" y="6" width="9" height="2" rx="1"/><rect x="1" y="10" width="14" height="2" rx="1"/><rect x="8" y="14" width="7" height="2" rx="1"/></svg>
+    </button>
+  </div>
+
+  <div class="tb-group">
+    <button class="tb-btn" onclick="fmt('insertUnorderedList')" title="无序列表">
+      <svg viewBox="0 0 16 16"><circle cx="2.5" cy="4" r="1.5"/><rect x="5" y="3" width="10" height="2" rx="1"/><circle cx="2.5" cy="8" r="1.5"/><rect x="5" y="7" width="10" height="2" rx="1"/><circle cx="2.5" cy="12" r="1.5"/><rect x="5" y="11" width="10" height="2" rx="1"/></svg>
+    </button>
+    <button class="tb-btn" onclick="fmt('insertOrderedList')" title="有序列表">
+      <svg viewBox="0 0 16 16"><text x="0" y="5" font-size="5" font-family="monospace">1.</text><rect x="5" y="3" width="10" height="2" rx="1"/><text x="0" y="9" font-size="5" font-family="monospace">2.</text><rect x="5" y="7" width="10" height="2" rx="1"/><text x="0" y="13" font-size="5" font-family="monospace">3.</text><rect x="5" y="11" width="10" height="2" rx="1"/></svg>
+    </button>
+  </div>
+
+  <div class="tb-group">
+    <button class="tb-btn" onclick="insertCode()" title="行内代码">&lt;/&gt;</button>
+    <button class="tb-btn" onclick="insertHR()" title="分隔线">—</button>
+    <button class="tb-btn" onclick="insertLink()" title="插入链接">🔗</button>
+  </div>
+
+  <div class="tb-group">
+    <button class="tb-btn" onclick="document.execCommand('undo')" title="撤销 (Ctrl+Z)">↩</button>
+    <button class="tb-btn" onclick="document.execCommand('redo')" title="重做 (Ctrl+Y)">↪</button>
+  </div>
+</div>
+
+<!-- Main -->
+<div id="main">
+  <!-- Outline -->
+  <div id="outline-panel">
+    <div class="panel-header">文档大纲</div>
+    <div id="outline-list"><p style="padding:12px 16px;font-size:12px;color:var(--text-muted)">暂无标题</p></div>
+  </div>
+
+  <!-- Editor -->
+  <div id="editor-wrap">
+    <div id="editor-page">
+      <div id="editor"
+           contenteditable="true"
+           spellcheck="false"
+           data-placeholder="开始编写内容……按 Enter 新建段落，使用上方工具栏设置标题和样式。">
+        <p><br></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Collaborator bar -->
+<div id="collab-bar">
+  <div id="avatar-list"></div>
+  <span id="collab-text">仅我自己</span>
+</div>
+
+<!-- Share modal -->
+<div id="modal-overlay" onclick="closeShare(event)">
+  <div id="modal">
+    <h3>分享文档</h3>
+    <p>复制下方链接发给他人，对方打开后即可共同编辑。</p>
+    <div class="share-link-box">
+      <input type="text" id="share-url" readonly>
+      <button class="copy-btn" onclick="copyLink()">复制</button>
+    </div>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">
+      💡 数据存储在浏览器本地（localStorage），同一浏览器同一链接的用户可共享编辑记录。如需真正多人实时协作，可将此 HTML 文件托管到服务器并接入 WebSocket 后端。
+    </p>
+    <button class="modal-close" onclick="closeShare()">关闭</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ─── State ───────────────────────────────────────────
+const editor = document.getElementById('editor');
+const blockTypeSelect = document.getElementById('block-type');
+const outlineList = document.getElementById('outline-list');
+const syncDot = document.getElementById('sync-dot');
+const syncText = document.getElementById('sync-text');
+
+// Storage key: derive from URL hash or default
+let storageKey = 'collab-doc-' + (location.hash.slice(1) || 'default');
+let saveTimer = null;
+let isLoading = false;
+
+// ─── Init ─────────────────────────────────────────────
+function init() {
+  // Set share URL
+  const shareInput = document.getElementById('share-url');
+  const url = location.href.split('#')[0] + '#' + storageKey.replace('collab-doc-', '');
+  shareInput.value = url;
+
+  loadDoc();
+  renderAvatars();
+  setInterval(checkStorageUpdate, 1500); // poll for changes from other tabs
+}
+
+// ─── Load / Save ──────────────────────────────────────
+function loadDoc() {
+  isLoading = true;
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (raw) {
+      const data = JSON.parse(raw);
+      document.getElementById('doc-title-input').value = data.title || '未命名文档';
+      editor.innerHTML = data.content || '<p><br></p>';
+    }
+  } catch(e) {}
+  isLoading = false;
+  updateOutline();
+}
+
+let lastSavedContent = '';
+function saveDoc(immediate) {
+  if (isLoading) return;
+  clearTimeout(saveTimer);
+  const doSave = () => {
+    setSyncStatus('saving');
+    const data = {
+      title: document.getElementById('doc-title-input').value,
+      content: editor.innerHTML,
+      ts: Date.now()
+    };
+    localStorage.setItem(storageKey, JSON.stringify(data));
+    lastSavedContent = editor.innerHTML;
+    setTimeout(() => setSyncStatus('saved'), 400);
+  };
+  if (immediate) { doSave(); }
+  else { saveTimer = setTimeout(doSave, 800); setSyncStatus('saving'); }
+}
+
+let lastPollTs = 0;
+function checkStorageUpdate() {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (data.ts > lastPollTs && data.ts > (Date.now() - 5000)) {
+      lastPollTs = data.ts;
+      // Only update if not currently focused / editing
+      if (document.activeElement !== editor) {
+        const sel = saveCaretPos();
+        editor.innerHTML = data.content || '<p><br></p>';
+        restoreCaretPos(sel);
+        document.getElementById('doc-title-input').value = data.title || '未命名文档';
+        updateOutline();
+      }
+    }
+  } catch(e) {}
+}
+
+function setSyncStatus(state) {
+  syncDot.className = 'dot ' + state;
+  syncText.textContent = state === 'saving' ? '保存中…' : '已保存';
+}
+
+// ─── Editor events ────────────────────────────────────
+editor.addEventListener('input', () => {
+  updateOutline();
+  saveDoc();
+});
+
+editor.addEventListener('keydown', e => {
+  // Enter in heading → insert new paragraph
+  if (e.key === 'Enter' && !e.shiftKey) {
+    const block = getBlockAtCaret();
+    if (block && /^H[123]$/.test(block.tagName)) {
+      e.preventDefault();
+      document.execCommand('insertParagraph');
+      const newBlock = getBlockAtCaret();
+      if (newBlock && /^H[123]$/.test(newBlock.tagName)) {
+        // Convert the new block to paragraph
+        document.execCommand('formatBlock', false, 'p');
+      }
+    }
+  }
+});
+
+editor.addEventListener('keyup', updateToolbarState);
+editor.addEventListener('mouseup', updateToolbarState);
+editor.addEventListener('selectionchange', updateToolbarState);
+
+document.getElementById('doc-title-input').addEventListener('input', () => saveDoc());
+
+// ─── Formatting ───────────────────────────────────────
+function fmt(cmd) {
+  editor.focus();
+  document.execCommand(cmd, false, null);
+  updateToolbarState();
+  saveDoc();
+}
+
+function applyBlockType(val) {
+  editor.focus();
+  if (val === 'blockquote') {
+    document.execCommand('formatBlock', false, 'blockquote');
+  } else {
+    document.execCommand('formatBlock', false, val);
+  }
+  updateOutline();
+  saveDoc();
+}
+
+function insertCode() {
+  editor.focus();
+  const sel = window.getSelection();
+  const text = sel.toString();
+  const code = document.createElement('code');
+  code.textContent = text || 'code';
+  if (sel.rangeCount) {
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+    range.insertNode(code);
+    range.setStartAfter(code);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+  saveDoc();
+}
+
+function insertHR() {
+  editor.focus();
+  document.execCommand('insertHorizontalRule');
+  saveDoc();
+}
+
+function insertLink() {
+  const url = prompt('请输入链接地址：', 'https://');
+  if (url) {
+    editor.focus();
+    document.execCommand('createLink', false, url);
+    // Open in new tab
+    editor.querySelectorAll('a').forEach(a => a.target = '_blank');
+    saveDoc();
+  }
+}
+
+// ─── Toolbar state ────────────────────────────────────
+function updateToolbarState() {
+  const block = getBlockAtCaret();
+  if (block) {
+    const tag = block.tagName.toLowerCase();
+    const val = tag === 'blockquote' ? 'blockquote' : (tag.match(/^h[123]$/) ? tag : 'p');
+    blockTypeSelect.value = val;
+  }
+
+  ['bold','italic','underline','strikeThrough'].forEach(cmd => {
+    // can't reliably track active state for toolbar buttons via queryCommandState in all browsers
+  });
+}
+
+// ─── Block helpers ────────────────────────────────────
+function getBlockAtCaret() {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return null;
+  let node = sel.getRangeAt(0).startContainer;
+  while (node && node !== editor) {
+    if (node.nodeType === 1 && ['P','H1','H2','H3','BLOCKQUOTE','LI','DIV'].includes(node.tagName)) {
+      return node;
+    }
+    node = node.parentNode;
+  }
+  return null;
+}
+
+// ─── Outline ──────────────────────────────────────────
+function updateOutline() {
+  const headings = editor.querySelectorAll('h1, h2, h3');
+  if (headings.length === 0) {
+    outlineList.innerHTML = '<p style="padding:12px 16px;font-size:12px;color:var(--text-muted)">暂无标题</p>';
+    return;
+  }
+  outlineList.innerHTML = '';
+  headings.forEach((h, i) => {
+    if (!h.id) h.id = 'heading-' + i;
+    const tag = h.tagName.toLowerCase();
+    const item = document.createElement('div');
+    item.className = 'outline-item ' + tag;
+    item.textContent = h.textContent || '（空标题）';
+    item.onclick = () => {
+      h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.querySelectorAll('.outline-item').forEach(el => el.classList.remove('active'));
+      item.classList.add('active');
+    };
+    outlineList.appendChild(item);
+  });
+}
+
+// ─── Outline toggle ───────────────────────────────────
+function toggleOutline() {
+  document.getElementById('outline-panel').classList.toggle('collapsed');
+}
+
+// ─── Share ────────────────────────────────────────────
+function openShare() {
+  document.getElementById('modal-overlay').classList.add('show');
+}
+function closeShare(e) {
+  if (!e || e.target === document.getElementById('modal-overlay')) {
+    document.getElementById('modal-overlay').classList.remove('show');
+  }
+}
+function copyLink() {
+  const input = document.getElementById('share-url');
+  input.select();
+  document.execCommand('copy');
+  showToast('链接已复制！');
+}
+
+// ─── Export ───────────────────────────────────────────
+function exportDoc() {
+  const title = document.getElementById('doc-title-input').value || '文档';
+  const html = `<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><title>${title}</title>
+<style>
+  body{font-family:'Noto Serif SC',serif;max-width:780px;margin:40px auto;padding:0 32px;color:#1a1816;line-height:1.9;}
+  h1{font-size:28px;border-bottom:2px solid #e8e4de;padding-bottom:8px;}
+  h2{font-size:21px;}h3{font-size:17px;color:#6b6560;}
+  blockquote{border-left:3px solid #2d5a27;padding:8px 16px;background:#e8f0e7;margin:16px 0;}
+  code{background:#f4f1ec;padding:2px 6px;border-radius:4px;color:#c0392b;}
+</style></head><body>
+<h1>${title}</h1>
+${editor.innerHTML}
+</body></html>`;
+  const blob = new Blob([html], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = title + '.html';
+  a.click();
+  showToast('文档已导出！');
+}
+
+// ─── Toast ────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ─── Avatar / Collaborators ───────────────────────────
+const colors = ['#e74c3c','#3498db','#8e44ad','#27ae60','#d35400','#16a085'];
+function renderAvatars() {
+  // Show current "user" as an avatar
+  const key = 'collab-username';
+  let name = localStorage.getItem(key);
+  if (!name) {
+    const chars = '你我他她它';
+    name = chars[Math.floor(Math.random() * chars.length)] + Math.floor(Math.random()*90+10);
+    localStorage.setItem(key, name);
+  }
+  const list = document.getElementById('avatar-list');
+  const av = document.createElement('div');
+  av.className = 'avatar';
+  av.style.background = colors[name.charCodeAt(0) % colors.length];
+  av.textContent = name[0];
+  av.title = name;
+  list.appendChild(av);
+  document.getElementById('collab-text').textContent = name;
+}
+
+// ─── Caret save/restore ───────────────────────────────
+function saveCaretPos() {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return null;
+  const range = sel.getRangeAt(0);
+  return { start: getOffset(range.startContainer, range.startOffset) };
+}
+function restoreCaretPos(saved) {
+  if (!saved) return;
+  // Simplified: just move to end
+}
+function getOffset(node, offset) {
+  let pos = 0;
+  const walk = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+  while (walk.nextNode()) {
+    if (walk.currentNode === node) return pos + offset;
+    pos += walk.currentNode.length;
+  }
+  return pos;
+}
+
+// ─── Keyboard shortcuts ───────────────────────────────
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    saveDoc(true);
+    showToast('文档已保存');
+  }
+});
+
+// ─── Start ────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
